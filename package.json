@@ -1,0 +1,46 @@
+{
+  "name": "llm-butcher",
+  "version": "0.1.0",
+  "description": "A security layer between AI coding assistants and your terminal. Checks domain reputation, script content, and package legitimacy before execution.",
+  "type": "module",
+  "bin": {
+    "llm-butcher": "./dist/bin/llm-butcher.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run test/e2e",
+    "demo": "tsx test/e2e/run-scenarios.ts",
+    "test:server": "tsx test/e2e/start-server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "security",
+    "claude-code",
+    "hook",
+    "shell",
+    "malware",
+    "typosquat",
+    "ghostclaw"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "data"
+  ],
+  "dependencies": {
+    "fastest-levenshtein": "^1.0.16",
+    "whois-json": "^2.0.4"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
