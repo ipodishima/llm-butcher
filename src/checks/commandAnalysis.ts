@@ -91,6 +91,15 @@ const COMMAND_PATTERNS: CommandPattern[] = [
       "This command sends data to a remote server via netcat. Do NOT run it.",
   },
 
+  // wget pipe to shell (parity with curl | sh)
+  {
+    regex: /wget\s+[^\n]*-O\s*-[^\n]*\|\s*(?:sudo\s+)?(?:ba)?sh/i,
+    title: "wget output piped to shell",
+    severity: Severity.CRITICAL,
+    recommendation:
+      "This command downloads a remote script and executes it. Do NOT run it without reviewing the script first.",
+  },
+
   // Base64 decode to shell
   {
     regex: /base64\s+(?:-d|--decode|-D)\s*\|?\s*(?:ba)?sh|atob\s*\(.*\)\s*\|\s*(?:ba)?sh/i,
@@ -114,6 +123,15 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     severity: Severity.CRITICAL,
     recommendation:
       "This command accesses cryptocurrency wallet data. Do NOT run it.",
+  },
+
+  // macOS ditto (cp equivalent)
+  {
+    regex: /\bditto\s+[^\n]*~\/\.(?:ssh|aws|gnupg)/i,
+    title: "Sensitive directory copied via ditto",
+    severity: Severity.CRITICAL,
+    recommendation:
+      "ditto is macOS's copy tool. This command copies credential directories. Do NOT run it.",
   },
 
   // Sensitive directory archival + exfil
@@ -513,6 +531,22 @@ const COMMAND_PATTERNS: CommandPattern[] = [
   },
 
   // ── Round 5: destructive ops, hosts, MDM, Apple data, binary replacement ──
+
+  // Destructive commands
+  {
+    regex: /\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f|--no-preserve-root|-[a-zA-Z]*f[a-zA-Z]*r)\s+\//i,
+    title: "Recursive force delete from root",
+    severity: Severity.CRITICAL,
+    recommendation:
+      "This command recursively deletes files from the root filesystem. Do NOT run it.",
+  },
+  {
+    regex: /:\(\)\{\s*:\|:&\s*\};:|:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
+    title: "Fork bomb",
+    severity: Severity.CRITICAL,
+    recommendation:
+      "This command is a fork bomb that will crash your system by exhausting all processes. Do NOT run it.",
+  },
 
   // Destructive disk operations
   {
