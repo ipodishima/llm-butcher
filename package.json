@@ -26,6 +26,11 @@
     "ghostclaw"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ipodishima/llm-butcher.git"
+  },
+  "homepage": "https://github.com/ipodishima/llm-butcher#readme",
   "engines": {
     "node": ">=18.0.0"
   },
