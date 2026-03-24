@@ -1,5 +1,9 @@
 # LLM-Butcher
 
+<p align="center">
+  <img src="llm-butcher-cover.jpg" alt="LLM-Butcher" width="100%">
+</p>
+
 A security layer between AI coding assistants and your terminal.
 
 LLM-Butcher intercepts shell commands before execution and checks whether the targets — domains, scripts, and packages — are actually trustworthy. It catches supply chain attacks like [GhostClaw](https://www.jamf.com/blog/ghostclaw-ghostloader-malware-github-repositories-ai-workflows/) that exploit the trust developers place in README install instructions.
