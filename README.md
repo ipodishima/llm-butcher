@@ -32,6 +32,8 @@ So I built LLM-Butcher to sit between the AI and the terminal and ask that quest
 
 ## The Real Vulnerability
 
+https://github.com/user-attachments/assets/7c29a774-4088-49f8-806b-fbf0376e8104
+
 Be honest with yourself: when Claude Code says "I'll run `npm install some-package`" or "I'll execute this install script" — do you actually read the full command? Check the domain? Inspect what the script does?
 
 I don't. If it doesn't look obviously dangerous, I click Allow and move on. I've done it hundreds of times. And I'd bet most developers using AI coding tools are doing the same thing.
