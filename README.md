@@ -10,6 +10,7 @@
   <a href="https://www.npmjs.com/package/llm-butcher"><img src="https://img.shields.io/npm/dm/llm-butcher.svg" alt="downloads"></a>
   <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/rules-114-blue.svg" alt="rules"></a>
   <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/tests-203-brightgreen.svg" alt="tests"></a>
+  <a href="https://buymeacoffee.com/marianpaul"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 A security layer between AI coding assistants and your terminal.
@@ -387,6 +388,12 @@ If you have cybersecurity expertise, your input is especially valuable. Open an 
 - [abuse.ch URLhaus](https://urlhaus.abuse.ch/) — Malware URL blocklist
 - [fastest-levenshtein](https://github.com/ka-weihe/fastest-levenshtein) — Levenshtein distance calculation
 - [whois-json](https://www.npmjs.com/package/whois-json) — WHOIS lookups
+
+## Support
+
+If LLM-Butcher is useful to you, consider buying me a coffee:
+
+<a href="https://buymeacoffee.com/marianpaul"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=marianpaul&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
 
 ## License
 
