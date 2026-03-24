@@ -389,12 +389,6 @@ If you have cybersecurity expertise, your input is especially valuable. Open an 
 - [fastest-levenshtein](https://github.com/ka-weihe/fastest-levenshtein) — Levenshtein distance calculation
 - [whois-json](https://www.npmjs.com/package/whois-json) — WHOIS lookups
 
-## Support
-
-If LLM-Butcher is useful to you, consider buying me a coffee:
-
-<a href="https://buymeacoffee.com/marianpaul"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=marianpaul&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
-
 ## License
 
 MIT
