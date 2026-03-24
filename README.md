@@ -26,6 +26,16 @@ So I built LLM-Butcher to sit between the AI and the terminal and ask that quest
 
 > **Disclaimer:** I am not a cybersecurity expert. I'm an iOS developer who got scared by a real attack and decided to do something about it. This is an MVP — it catches the patterns I know about, but it's far from complete. Pull requests, suggestions, and security reviews are very welcome. If you know more about this space than I do (which is likely), I'd love your input.
 
+## The Real Vulnerability
+
+Be honest with yourself: when Claude Code says "I'll run `npm install some-package`" or "I'll execute this install script" — do you actually read the full command? Check the domain? Inspect what the script does?
+
+I don't. If it doesn't look obviously dangerous, I click Allow and move on. I've done it hundreds of times. And I'd bet most developers using AI coding tools are doing the same thing.
+
+That's not carelessness — it's trust. You trust the tool, the tool trusts the README, and the README trusts whoever wrote it. The entire chain runs on trust, and nobody is verifying the last link. That's the real vulnerability. Not a zero-day. Not a CVE. Just human nature scaled up by AI speed.
+
+LLM-Butcher exists because I realized I needed something to check the things I wasn't checking.
+
 ## The Problem
 
 AI coding assistants (Claude Code, Cursor, Copilot) read README files and execute install commands without verifying if the targets are safe. Attackers exploit this by:

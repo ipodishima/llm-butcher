@@ -1,6 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { analyzeCommand } from "../../src/checks/commandAnalysis.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { analyzeCommand, initCommandRules } from "../../src/checks/commandAnalysis.js";
 import { Severity } from "../../src/checks/types.js";
+import { resetRuleCache } from "../../src/rules/loader.js";
+
+beforeAll(async () => {
+  resetRuleCache();
+  await initCommandRules();
+});
 
 describe("commandAnalysis", () => {
   describe("reverse shells", () => {

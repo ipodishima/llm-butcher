@@ -1,8 +1,9 @@
 import { classifyCommand } from "./parser/commandClassifier.js";
-import { analyzeCommand } from "./checks/commandAnalysis.js";
+import { analyzeCommand, initCommandRules } from "./checks/commandAnalysis.js";
 import { checkDomainReputation } from "./checks/domainReputation.js";
-import { analyzeScript } from "./checks/scriptAnalysis.js";
+import { analyzeScript, initScriptRules } from "./checks/scriptAnalysis.js";
 import { checkTyposquat } from "./checks/typosquatDetection.js";
+import { analyzeShellHeuristics } from "./checks/shellHeuristics.js";
 import { formatResults } from "./output/formatter.js";
 import { loadConfig } from "./config/loader.js";
 import { logAudit } from "./audit.js";
@@ -18,16 +19,44 @@ export interface HookInput {
   session_id?: string;
 }
 
+let rulesInitialized = false;
+
+/** Reset rules initialization state (for testing) */
+export function resetRulesState(): void {
+  rulesInitialized = false;
+}
+
+async function ensureRulesLoaded(config: {
+  rules?: { disabledPacks?: string[]; disabledRules?: string[] };
+}): Promise<void> {
+  if (rulesInitialized) return;
+  const options = config.rules
+    ? {
+        disabledPacks: config.rules.disabledPacks,
+        disabledRules: config.rules.disabledRules,
+      }
+    : undefined;
+  await Promise.all([initCommandRules(options), initScriptRules(options)]);
+  rulesInitialized = true;
+}
+
 export async function run(command: string): Promise<{
   output: string;
   exitCode: number;
   results: CheckResult[];
 }> {
   const config = await loadConfig();
+  await ensureRulesLoaded(config);
+
   const classification = classifyCommand(command);
 
   // Always scan the command itself for dangerous patterns
   const commandResults = analyzeCommand(command);
+
+  // Shell heuristics: resolve variables and check for obfuscation
+  const existingTitles = new Set(commandResults.map((r) => r.title));
+  const heuristicResults = analyzeShellHeuristics(command, existingTitles);
+  commandResults.push(...heuristicResults);
 
   // If no URLs or packages and no command-level findings, pass through
   if (

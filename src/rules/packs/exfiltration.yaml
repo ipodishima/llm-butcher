@@ -1,0 +1,223 @@
+id: exfiltration
+name: Data Exfiltration Detection
+description: Detects data exfiltration patterns including clipboard, shell history, environment variables, and network exfil
+rules:
+  - id: netcat-exfil
+    name: "Data piped to remote host via netcat"
+    severity: critical
+    tags: [exfiltration, netcat]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\|\s*nc\s+\S+\s+\d+|\|\s*ncat\s+\S+\s+\d+'
+    recommendation: "This command sends data to a remote server via netcat. Do NOT run it."
+
+  - id: env-var-exfil
+    name: "Environment variables piped to remote host"
+    severity: critical
+    tags: [exfiltration, environment]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\b(?:env|printenv|set)\s*\|.*(?:curl|wget|nc\b|ncat\b)'
+    recommendation: "This command sends all environment variables (which may contain secrets, tokens, and API keys) to a remote server. Do NOT run it."
+
+  - id: clipboard-exfil
+    name: "Clipboard contents exfiltrated to remote host"
+    severity: critical
+    tags: [exfiltration, clipboard, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'pbpaste\s*\|.*(?:curl|wget|nc\b|ncat\b)'
+    recommendation: "This command sends your clipboard (which may contain passwords or tokens) to a remote server. Do NOT run it."
+
+  - id: clipboard-hijack
+    name: "Clipboard hijack"
+    severity: high
+    tags: [exfiltration, clipboard]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'pbcopy\s*<|<<<.*pbcopy|echo\s.*\|\s*pbcopy'
+    recommendation: "This command overwrites your clipboard. Used in crypto address swap scams. Verify the content."
+
+  - id: shell-history-exfil
+    name: "Shell history exfiltrated to remote host"
+    severity: critical
+    tags: [exfiltration, history]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:history|cat\s+[^\n]*(?:\.zsh_history|\.bash_history|\.history))\s*\|.*(?:curl|wget|nc\b)'
+    recommendation: "This command sends your shell history (which contains commands, paths, and possibly secrets) to a remote server. Do NOT run it."
+
+  - id: shell-history-access
+    name: "Shell history file access"
+    severity: high
+    tags: [exfiltration, history]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'cat\s+[^\n]*(?:\.zsh_history|\.bash_history)'
+    recommendation: "This command reads your shell history. Verify this is expected."
+
+  - id: dotenv-exfil
+    name: "dotenv file exfiltrated to remote host"
+    severity: critical
+    tags: [exfiltration, dotenv]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'cat\s+[^\n]*\.env[^\n]*\|.*(?:curl|wget|nc\b)'
+    recommendation: "This command sends your .env file (containing API keys, DB passwords, secrets) to a remote server. Do NOT run it."
+
+  - id: dotenv-access
+    name: "dotenv file access"
+    severity: medium
+    tags: [exfiltration, dotenv]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'cat\s+[^\n]*\.env(?:\.local|\.production|\.development)?\b'
+    recommendation: "This command reads a .env file. These typically contain secrets. Verify this is expected."
+
+  - id: shell-profile-secret-harvest
+    name: "Shell profile secrets harvested and exfiltrated"
+    severity: critical
+    tags: [exfiltration, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:cat|grep)\s+[^\n]*~\/\.(?:zshrc|bashrc|bash_profile|profile|zprofile)[^\n]*\|\s*(?:curl|wget|nc\b)'
+    recommendation: "This command reads your shell profile (which may contain API keys and tokens) and sends it to a remote server. Do NOT run it."
+
+  - id: secret-grep-exfil
+    name: "Secret/token grep piped to remote host"
+    severity: critical
+    tags: [exfiltration, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'grep\s+[^\n]*(?:TOKEN|SECRET|KEY|PASSWORD|API)[^\n]*\|\s*(?:curl|wget|nc\b)'
+    recommendation: "This command searches for secrets and sends them to a remote server. Do NOT run it."
+
+  - id: ssh-dir-archive
+    name: "Archiving SSH directory"
+    severity: critical
+    tags: [exfiltration, ssh]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'tar\s+[^\n]*~\/\.ssh'
+    recommendation: "This command archives your SSH keys. Do NOT run it unless you trust the destination."
+
+  - id: aws-dir-archive
+    name: "Archiving AWS credentials directory"
+    severity: critical
+    tags: [exfiltration, aws]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'tar\s+[^\n]*~\/\.aws'
+    recommendation: "This command archives your AWS credentials. Do NOT run it."
+
+  - id: gpg-dir-archive
+    name: "Archiving GPG keys directory"
+    severity: critical
+    tags: [exfiltration, gpg]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'tar\s+[^\n]*~\/\.gnupg'
+    recommendation: "This command archives your GPG keys. Do NOT run it."
+
+  - id: ditto-credential-copy
+    name: "Sensitive directory copied via ditto"
+    severity: critical
+    tags: [exfiltration, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bditto\s+[^\n]*~\/\.(?:ssh|aws|gnupg)'
+    recommendation: "ditto is macOS's copy tool. This command copies credential directories. Do NOT run it."
+
+  - id: system-recon-exfil
+    name: "System reconnaissance data exfiltrated"
+    severity: critical
+    tags: [exfiltration, recon]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:system_profiler|sw_vers|ifconfig|networksetup\s+-listallhardwareports)[^\n]*\|\s*(?:curl|wget|nc\b)'
+    recommendation: "This command collects system information and sends it to a remote server. Do NOT run it."
+
+  - id: macos-log-exfil
+    name: "macOS unified log exfiltrated"
+    severity: critical
+    tags: [exfiltration, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\blog\s+show\s+--predicate[^\n]*\|\s*(?:curl|wget|nc\b)'
+    recommendation: "This command extracts system logs and sends them to a remote server. Do NOT run it."
+
+  - id: spotlight-recon-exfil
+    name: "Spotlight search for secrets piped to another command"
+    severity: critical
+    tags: [exfiltration, recon, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'mdfind\s+[^\n]*(?:secret|password|token|credential|\.env|\.pem|\.key)[^\n]*\|'
+    recommendation: "This command uses Spotlight to find sensitive files across your entire disk and pipes the results. Do NOT run it."
+
+  - id: sensitive-dir-rsync
+    name: "Sensitive directories synced to remote host"
+    severity: critical
+    tags: [exfiltration, ssh, aws]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:rsync|scp)\s+[^\n]*(?:~\/\.ssh|~\/\.aws|~\/\.gnupg|~\/\.kube)[^\n]*@'
+    recommendation: "This command copies credential directories to a remote server. Do NOT run it."
+
+  - id: chat-app-data
+    name: "Chat application data access"
+    severity: critical
+    tags: [exfiltration, chat]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'Application\s*Support\/(?:Slack|discord|Discord|Microsoft\s*Teams|Telegram)'
+    recommendation: "This command accesses chat application data (Slack, Discord, Teams, or Telegram). Tokens and messages may be stolen. Do NOT run it."
+
+  - id: discord-token-extraction
+    name: "Discord token extraction from LevelDB"
+    severity: critical
+    tags: [exfiltration, chat, discord]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\.ldb[^\n]*(?:mfa\.|dQw|token)'
+    recommendation: "This command searches Discord LevelDB files for authentication tokens. Do NOT run it."
+
+  - id: home-dir-archive
+    name: "Home directory bulk archive"
+    severity: high
+    tags: [exfiltration, bulk]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:tar|zip)\s+[^\n]*~\/(?:Documents|Desktop|Downloads)'
+    recommendation: "This command archives personal directories. Verify this is expected and check where the archive is being sent."
+
+  - id: chunked-exfil
+    name: "Chunked data exfiltration (split + upload)"
+    severity: critical
+    tags: [exfiltration, evasion]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'split\s+[^\n]*&&[^\n]*(?:curl|wget)'
+    recommendation: "This command splits data into chunks and uploads them — a technique to evade size-based detection. Do NOT run it."

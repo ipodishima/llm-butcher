@@ -1,0 +1,63 @@
+id: reverse-shells
+name: Reverse Shell Detection
+description: Detects reverse shell patterns across multiple languages and techniques
+rules:
+  - id: reverse-shell-dev-tcp
+    name: "Reverse shell via /dev/tcp"
+    severity: critical
+    tags: [reverse-shell, network]
+    scope: both
+    match:
+      mode: regex
+      pattern: '\/dev\/tcp\/[^\s]+'
+    recommendation: "This command opens a reverse shell connection. Do NOT run it."
+
+  - id: reverse-shell-interactive
+    name: "Interactive reverse shell"
+    severity: critical
+    tags: [reverse-shell, bash]
+    scope: both
+    match:
+      mode: regex
+      pattern: '\bbash\s+-i\s+>&'
+    recommendation: "This command opens an interactive reverse shell. Do NOT run it."
+
+  - id: reverse-shell-netcat
+    name: "Reverse shell via netcat/mkfifo"
+    severity: critical
+    tags: [reverse-shell, netcat]
+    scope: both
+    match:
+      mode: regex
+      pattern: '\bnc\s+-e\s|ncat\s+-e\s|mkfifo\s'
+    recommendation: "This command sets up a reverse shell connection. Do NOT run it."
+
+  - id: reverse-shell-perl
+    name: "Reverse shell via Perl"
+    severity: critical
+    tags: [reverse-shell, perl]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bperl\s+-e\s.*socket'
+    recommendation: "This command uses Perl to open a network socket — likely a reverse shell. Do NOT run it."
+
+  - id: reverse-shell-ruby
+    name: "Reverse shell via Ruby"
+    severity: critical
+    tags: [reverse-shell, ruby]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bruby\s+-rsocket'
+    recommendation: "This command uses Ruby sockets — likely a reverse shell. Do NOT run it."
+
+  - id: reverse-shell-python
+    name: "Reverse shell via Python"
+    severity: critical
+    tags: [reverse-shell, python]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bpython3?\s+.*(?:socket\.socket|subprocess.*PIPE.*socket|pty\.spawn)'
+    recommendation: "This command uses Python sockets — likely a reverse shell. Do NOT run it."

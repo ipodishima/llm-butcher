@@ -1,6 +1,6 @@
 {
   "name": "llm-butcher",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A security layer between AI coding assistants and your terminal. Checks domain reputation, script content, and package legitimacy before execution.",
   "type": "module",
   "bin": {
@@ -35,9 +35,11 @@
   ],
   "dependencies": {
     "fastest-levenshtein": "^1.0.16",
+    "js-yaml": "^4.1.1",
     "whois-json": "^2.0.4"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "tsup": "^8.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.4.0",

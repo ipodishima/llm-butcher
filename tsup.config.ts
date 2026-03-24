@@ -1,4 +1,5 @@
 import { defineConfig } from "tsup";
+import { cpSync } from "node:fs";
 
 export default defineConfig([
   {
@@ -11,6 +12,12 @@ export default defineConfig([
     sourcemap: true,
     banner: {
       js: "#!/usr/bin/env node",
+    },
+    onSuccess: async () => {
+      // Copy YAML rule packs to dist so they're available at runtime
+      cpSync("src/rules/packs", "dist/rules/packs", { recursive: true });
+      // Copy data files
+      cpSync("src/data", "dist/data", { recursive: true });
     },
   },
   {

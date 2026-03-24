@@ -1,0 +1,94 @@
+id: persistence
+name: Persistence Mechanism Detection
+description: Detects persistence mechanisms including LaunchAgents, crontab, shell profile injection, and delayed execution
+rules:
+  - id: launchagent-path
+    name: "LaunchAgent/LaunchDaemon path access"
+    severity: high
+    tags: [persistence, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: '~\/Library\/LaunchAgents\/|\/Library\/LaunchDaemons\/'
+    recommendation: "This command accesses macOS LaunchAgent/LaunchDaemon paths used for persistence. Verify this is expected."
+
+  - id: persistence-install
+    name: "Persistence mechanism installation"
+    severity: high
+    tags: [persistence]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'launchctl\s+(?:load|submit|enable)|crontab\s'
+    recommendation: "This command installs a persistence mechanism. Verify this is expected."
+
+  - id: shell-profile-injection
+    name: "Shell profile injection"
+    severity: high
+    tags: [persistence, shell]
+    scope: command
+    match:
+      mode: regex
+      pattern: '>>\s*~\/\.(?:zshrc|bashrc|bash_profile|profile|zprofile)'
+    recommendation: "This command appends to your shell profile. Malware uses this to persist across sessions. Verify the content being added."
+
+  - id: global-profile-injection
+    name: "Global shell profile injection"
+    severity: critical
+    tags: [persistence, shell]
+    scope: command
+    match:
+      mode: regex
+      pattern: '>>?\s*\/etc\/(?:profile|zshrc|bashrc|bash\.bashrc)'
+    recommendation: "This command modifies a system-wide shell profile, affecting all users. Do NOT run it."
+
+  - id: ssh-authorized-keys
+    name: "SSH authorized_keys injection"
+    severity: critical
+    tags: [persistence, ssh]
+    scope: command
+    match:
+      mode: regex
+      pattern: '>>?\s*~\/\.ssh\/authorized_keys'
+    recommendation: "This command adds an SSH key to your authorized_keys, granting remote access to your machine. Do NOT run it."
+
+  - id: sudoers-modification
+    name: "Sudoers file modification"
+    severity: critical
+    tags: [persistence, privilege-escalation]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\/etc\/sudoers'
+    recommendation: "This command modifies sudoers, which can grant passwordless root access to an attacker. Do NOT run it."
+
+  - id: pam-modification
+    name: "PAM configuration modification"
+    severity: critical
+    tags: [persistence, privilege-escalation]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\/etc\/pam\.d\/'
+    recommendation: "This command modifies PAM authentication modules. Do NOT run it."
+
+  - id: delayed-execution
+    name: "Delayed command execution via 'at'"
+    severity: high
+    tags: [persistence, evasion]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bat\s+(?:now|midnight|noon|\d)'
+    recommendation: "This command schedules execution for later, which can evade real-time security checks. Verify the scheduled command."
+
+  - id: persistence-script
+    name: "Script installs persistence mechanism"
+    severity: high
+    tags: [persistence]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'crontab|launchctl\s+(load|submit|enable)|systemctl\s+enable'
+      flags: gi
+    recommendation: "This script sets up automatic execution. Verify this is expected behavior."

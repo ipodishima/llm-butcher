@@ -1,145 +1,16 @@
 import { Severity, type CheckResult } from "./types.js";
+import type { CompiledRule } from "../rules/types.js";
+import { loadAllRules, getScriptRules } from "../rules/loader.js";
+import type { LoadRulesOptions } from "../rules/loader.js";
 
-interface MaliciousPattern {
-  regex: RegExp;
-  title: string;
-  severity: Severity;
-  recommendation: string;
+let scriptRules: CompiledRule[] | null = null;
+
+export async function initScriptRules(
+  options?: LoadRulesOptions
+): Promise<void> {
+  const allRules = await loadAllRules(options);
+  scriptRules = getScriptRules(allRules);
 }
-
-const MALICIOUS_PATTERNS: MaliciousPattern[] = [
-  // Credential theft
-  {
-    regex: /\/etc\/passwd|\/etc\/shadow/gi,
-    title: "Script accesses system credential files",
-    severity: Severity.CRITICAL,
-    recommendation: "This script reads sensitive system files. Do NOT run it.",
-  },
-  {
-    regex: /~\/\.ssh\/|\.gnupg\/|\.aws\//gi,
-    title: "Script accesses SSH keys or cloud credentials",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This script accesses private keys or cloud credentials. Do NOT run it.",
-  },
-  {
-    regex: /bitcoin|ethereum|wallet\.dat|\.solana|\.metamask/gi,
-    title: "Script targets cryptocurrency wallets",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This script targets crypto wallet data. Do NOT run it.",
-  },
-
-  // GhostClaw-specific patterns
-  {
-    regex: /dscl\s+\.\s+-authonly/gi,
-    title: "Script validates macOS credentials (GhostClaw indicator)",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This script uses dscl to validate your password — a known GhostClaw technique. Do NOT run it.",
-  },
-  {
-    regex: /x-apple\.systempreferences:.*Privacy/gi,
-    title: "Script manipulates macOS System Preferences",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This script tries to open System Preferences to gain elevated access. Do NOT run it.",
-  },
-  {
-    regex: /~\/\.cache\/\.npm_telemetry/gi,
-    title: "Known GhostClaw persistence path detected",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This path is used by GhostClaw malware for persistence. Do NOT run it.",
-  },
-  {
-    regex: /NODE_CHANNEL|GHOST_PASSWORD/gi,
-    title: "Known GhostClaw environment variables detected",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "These environment variables are associated with GhostClaw malware. Do NOT run it.",
-  },
-
-  // Reverse shells
-  {
-    regex: /\/dev\/tcp\/|nc\s+-e\s|ncat\s|mkfifo/gi,
-    title: "Script contains reverse shell patterns",
-    severity: Severity.CRITICAL,
-    recommendation:
-      "This script attempts to open a reverse shell connection. Do NOT run it.",
-  },
-
-  // Fake dialogs
-  {
-    regex: /osascript.*display\s+dialog/gi,
-    title: "Script creates fake macOS dialog to steal credentials",
-    severity: Severity.HIGH,
-    recommendation:
-      "This script shows fake system dialogs to trick you into entering your password.",
-  },
-
-  // Obfuscation
-  {
-    regex: /base64\s+(?:-d|--decode)|atob\s*\(/gi,
-    title: "Script uses base64 decoding (possible obfuscation)",
-    severity: Severity.HIGH,
-    recommendation:
-      "Base64 decoding in install scripts often hides malicious payloads. Review the decoded content.",
-  },
-  {
-    regex: /curl\s+[^|]*-k|curl\s+[^|]*--insecure/gi,
-    title: "Script disables TLS certificate validation",
-    severity: Severity.HIGH,
-    recommendation:
-      "Disabling certificate validation allows man-in-the-middle attacks.",
-  },
-
-  // Persistence
-  {
-    regex: /crontab|launchctl\s+(load|submit|enable)|systemctl\s+enable/gi,
-    title: "Script installs persistence mechanism",
-    severity: Severity.HIGH,
-    recommendation:
-      "This script sets up automatic execution. Verify this is expected behavior.",
-  },
-
-  // Nested download-and-execute
-  {
-    regex:
-      /(?:curl|wget)\s+[^|]*https?:\/\/[^\s]+[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh/gi,
-    title: "Script contains nested download-and-execute chain",
-    severity: Severity.HIGH,
-    recommendation:
-      "The script downloads and executes additional remote code. Review the nested URL.",
-  },
-
-  // Terminal clearing before credential theft
-  {
-    regex: /\\x1b\[2J|\\x1b\[3J|\\033\[2J/gi,
-    title: "Script clears terminal (possible credential theft setup)",
-    severity: Severity.HIGH,
-    recommendation:
-      "Terminal clearing before a prompt is a known technique to hide malicious activity.",
-  },
-
-  // Permission escalation
-  {
-    regex: /chmod\s+\+s|chmod\s+777/gi,
-    title: "Script sets SUID/world-writable permissions",
-    severity: Severity.MEDIUM,
-    recommendation:
-      "Setting SUID or world-writable permissions may indicate suspicious activity.",
-  },
-
-  // Dynamic code execution
-  {
-    regex: /\beval\s*\(/gi,
-    title: "Script uses dynamic code execution (eval)",
-    severity: Severity.MEDIUM,
-    recommendation:
-      "eval() in install scripts can hide malicious intent. Review what is being evaluated.",
-  },
-];
 
 function checkObfuscationLevel(content: string): CheckResult | null {
   // Count hex/octal escape sequences
@@ -243,19 +114,21 @@ async function fetchScript(
 }
 
 function scanContent(content: string, source: string): CheckResult[] {
+  if (!scriptRules) return [];
+
   const results: CheckResult[] = [];
 
-  for (const pattern of MALICIOUS_PATTERNS) {
-    pattern.regex.lastIndex = 0;
-    const match = pattern.regex.exec(content);
+  for (const rule of scriptRules) {
+    rule.regex.lastIndex = 0;
+    const match = rule.regex.exec(content);
     if (match) {
       const context = getContextLines(content, match.index);
       results.push({
         check: "script-analysis",
-        severity: pattern.severity,
-        title: pattern.title,
+        severity: rule.severity,
+        title: rule.name,
         details: `Match found in ${source}:\n${context}`,
-        recommendation: pattern.recommendation,
+        recommendation: rule.recommendation,
       });
     }
   }

@@ -1,0 +1,97 @@
+id: supply-chain
+name: Supply Chain Attack Detection
+description: Detects package manager hijacking, CocoaPods supply chain attacks, and base64 obfuscation
+rules:
+  - id: npm-config-hijack
+    name: "npm configuration hijack"
+    severity: critical
+    tags: [supply-chain, npm]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'npm\s+config\s+set\s+(?:script-shell|prefix|registry)'
+    recommendation: "This command changes npm's configuration. Setting script-shell or registry can redirect all future npm commands through an attacker. Do NOT run it."
+
+  - id: pip-registry-hijack
+    name: "pip registry hijack"
+    severity: critical
+    tags: [supply-chain, pip]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'pip\s+config\s+set\s+global\.index-url'
+    recommendation: "This command changes pip's package index to a potentially malicious registry. Do NOT run it."
+
+  - id: cocoapods-repo
+    name: "CocoaPods custom repo added"
+    severity: high
+    tags: [supply-chain, cocoapods]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'pod\s+repo\s+add'
+    recommendation: "This command adds a custom CocoaPods repo. Malicious repos can inject compromised dependencies. Verify the source."
+
+  - id: base64-decode-shell
+    name: "Base64-decoded payload piped to shell"
+    severity: critical
+    tags: [supply-chain, obfuscation]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'base64\s+(?:-d|--decode|-D)\s*\|?\s*(?:ba)?sh|atob\s*\(.*\)\s*\|\s*(?:ba)?sh'
+    recommendation: "This command decodes a hidden payload and executes it. Do NOT run it."
+
+  - id: base64-decode
+    name: "Base64 decoding in command"
+    severity: high
+    tags: [supply-chain, obfuscation]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'base64\s+(?:-d|--decode|-D)'
+    recommendation: "This command decodes base64 data. Verify the decoded content is safe."
+
+  - id: base64-script
+    name: "Script uses base64 decoding (possible obfuscation)"
+    severity: high
+    tags: [supply-chain, obfuscation]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'base64\s+(?:-d|--decode)|atob\s*\('
+      flags: gi
+    recommendation: "Base64 decoding in install scripts often hides malicious payloads. Review the decoded content."
+
+  - id: terminal-clearing-script
+    name: "Script clears terminal (possible credential theft setup)"
+    severity: high
+    tags: [supply-chain, evasion]
+    scope: script
+    match:
+      mode: regex
+      pattern: '\\x1b\[2J|\\x1b\[3J|\\033\[2J'
+      flags: gi
+    recommendation: "Terminal clearing before a prompt is a known technique to hide malicious activity."
+
+  - id: permission-escalation-script
+    name: "Script sets SUID/world-writable permissions"
+    severity: medium
+    tags: [supply-chain, privilege-escalation]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'chmod\s+\+s|chmod\s+777'
+      flags: gi
+    recommendation: "Setting SUID or world-writable permissions may indicate suspicious activity."
+
+  - id: eval-script
+    name: "Script uses dynamic code execution (eval)"
+    severity: medium
+    tags: [supply-chain, obfuscation]
+    scope: script
+    match:
+      mode: regex
+      pattern: '\beval\s*\('
+      flags: gi
+    recommendation: "eval() in install scripts can hide malicious intent. Review what is being evaluated."

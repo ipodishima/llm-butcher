@@ -1,0 +1,105 @@
+id: network
+name: Network & Download Security
+description: Detects insecure downloads, wget pipe to shell, and binary replacement attacks
+rules:
+  - id: wget-pipe-shell
+    name: "wget output piped to shell"
+    severity: critical
+    tags: [network, download-exec]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'wget\s+[^\n]*-O\s*-[^\n]*\|\s*(?:sudo\s+)?(?:ba)?sh'
+    recommendation: "This command downloads a remote script and executes it. Do NOT run it without reviewing the script first."
+
+  - id: insecure-download
+    name: "Download with disabled TLS verification"
+    severity: high
+    tags: [network, tls]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'curl\s+[^|]*(?:-k|--insecure)\s'
+    recommendation: "This command disables TLS certificate validation, enabling man-in-the-middle attacks."
+
+  - id: binary-replacement-download
+    name: "Binary replacement in /usr/local/bin"
+    severity: critical
+    tags: [network, trojan]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:curl|wget)\s+[^\n]*-o\s*\/usr\/local\/bin\/'
+    recommendation: "This command downloads a file directly into your PATH, potentially replacing a trusted binary (git, node, etc.) with malware. Do NOT run it."
+
+  - id: binary-placement
+    name: "File placed in /usr/local/bin"
+    severity: high
+    tags: [network, trojan]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:cp|mv)\s+[^\n]*\/usr\/local\/bin\/'
+    recommendation: "This command places a file in your PATH. Verify the source is trusted."
+
+  - id: dylib-injection
+    name: "macOS dylib injection (DYLD_INSERT_LIBRARIES)"
+    severity: critical
+    tags: [network, macos, injection]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'DYLD_INSERT_LIBRARIES'
+    recommendation: "This command injects a dynamic library into a process. Used for credential interception and process hijacking. Do NOT run it."
+
+  - id: git-remote-hijack
+    name: "Git remote URL modification"
+    severity: high
+    tags: [network, git]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'git\s+remote\s+set-url\s'
+    recommendation: "This command changes your git remote URL. Could redirect pushes to an attacker's repository. Verify the new URL."
+
+  - id: git-mirror-push
+    name: "Git mirror push (full source code theft)"
+    severity: critical
+    tags: [network, git, exfiltration]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'git\s+push\s+--mirror'
+    recommendation: "This command mirrors your entire repository to another remote. Do NOT run unless you trust the destination."
+
+  - id: ai-tool-config
+    name: "AI tool configuration access"
+    severity: high
+    tags: [network, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:cat|cp|tar)\s+[^\n]*~\/\.(?:claude|cursor|copilot|config\/anthropic|config\/openai)'
+    recommendation: "This command reads AI tool configuration files which may contain API keys. Verify this is expected."
+
+  - id: insecure-tls-script
+    name: "Script disables TLS certificate validation"
+    severity: high
+    tags: [network, tls]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'curl\s+[^|]*-k|curl\s+[^|]*--insecure'
+      flags: gi
+    recommendation: "Disabling certificate validation allows man-in-the-middle attacks."
+
+  - id: nested-download-exec
+    name: "Script contains nested download-and-execute chain"
+    severity: high
+    tags: [network, download-exec]
+    scope: script
+    match:
+      mode: regex
+      pattern: '(?:curl|wget)\s+[^|]*https?:\/\/[^\s]+[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh'
+      flags: gi
+    recommendation: "The script downloads and executes additional remote code. Review the nested URL."

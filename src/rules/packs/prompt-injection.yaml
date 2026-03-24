@@ -1,0 +1,43 @@
+id: prompt-injection
+name: Prompt Injection Detection
+description: Detects prompt injection attempts targeting AI assistants
+rules:
+  - id: instruction-override
+    name: "Prompt injection: instruction override attempt"
+    severity: critical
+    tags: [prompt-injection]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'ignore\s+(?:all\s+)?previous\s+instructions'
+    recommendation: "This content attempts to override AI assistant instructions. Do NOT execute."
+
+  - id: fake-system-message
+    name: "Prompt injection: fake system message"
+    severity: critical
+    tags: [prompt-injection]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\[SYSTEM\]:|<\/?system>|BEGIN\s+SYSTEM\s+PROMPT'
+    recommendation: "This content contains fake system message markers designed to trick AI assistants. Do NOT execute."
+
+  - id: suppression-directive
+    name: "Prompt injection: suppression directive"
+    severity: high
+    tags: [prompt-injection]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'do\s+not\s+(?:report|flag|mention|alert|warn)'
+    recommendation: "This content tells the AI to hide its findings. Suspicious."
+
+  - id: false-authority
+    name: "Prompt injection: false authority claim"
+    severity: critical
+    tags: [prompt-injection]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'pre-?approved\s+by\s+(?:anthropic|openai|google|microsoft)'
+    recommendation: "This content falsely claims authorization from an AI provider. Do NOT trust it."

@@ -1,0 +1,73 @@
+id: destructive
+name: Destructive Operations Detection
+description: Detects destructive commands including disk wipes, fork bombs, and system modifications
+rules:
+  - id: recursive-force-delete
+    name: "Recursive force delete from root"
+    severity: critical
+    tags: [destructive]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f|--no-preserve-root|-[a-zA-Z]*f[a-zA-Z]*r)\s+\/'
+    recommendation: "This command recursively deletes files from the root filesystem. Do NOT run it."
+
+  - id: fork-bomb
+    name: "Fork bomb"
+    severity: critical
+    tags: [destructive]
+    scope: command
+    match:
+      mode: regex
+      pattern: ':\(\)\{\s*:\|:&\s*\};:|:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:'
+    recommendation: "This command is a fork bomb that will crash your system by exhausting all processes. Do NOT run it."
+
+  - id: dd-disk-wipe
+    name: "Destructive disk wipe via dd"
+    severity: critical
+    tags: [destructive, disk]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bdd\s+if=\/dev\/(?:zero|random|urandom)\s+of=\/dev\/'
+    recommendation: "This command overwrites a disk device with zeros. This destroys all data. Do NOT run it."
+
+  - id: diskutil-erase
+    name: "Disk erase/format command"
+    severity: critical
+    tags: [destructive, disk, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'diskutil\s+(?:eraseDisk|eraseVolume|partitionDisk)'
+    recommendation: "This command erases or reformats a disk. Do NOT run it."
+
+  - id: mkfs-format
+    name: "Filesystem format command"
+    severity: critical
+    tags: [destructive, disk]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bmkfs\.'
+    recommendation: "This command creates a new filesystem, destroying existing data. Do NOT run it."
+
+  - id: hosts-file
+    name: "Hosts file modification"
+    severity: critical
+    tags: [destructive, network]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\/etc\/hosts'
+    recommendation: "This command modifies /etc/hosts, which can redirect domain names to attacker-controlled servers. Do NOT run it."
+
+  - id: mdm-profile
+    name: "macOS MDM profile installation"
+    severity: critical
+    tags: [destructive, macos]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'profiles\s+install|\.mobileconfig'
+    recommendation: "This command installs a management profile that can give an attacker full control of your device. Do NOT run it."

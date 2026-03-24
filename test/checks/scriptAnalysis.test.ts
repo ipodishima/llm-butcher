@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { analyzeScript } from "../../src/checks/scriptAnalysis.js";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { analyzeScript, initScriptRules } from "../../src/checks/scriptAnalysis.js";
 import { Severity } from "../../src/checks/types.js";
+import { resetRuleCache } from "../../src/rules/loader.js";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -16,6 +17,11 @@ function mockScriptResponse(content: string) {
 function mockFetchError() {
   mockFetch.mockRejectedValueOnce(new Error("Network error"));
 }
+
+beforeAll(async () => {
+  resetRuleCache();
+  await initScriptRules();
+});
 
 describe("scriptAnalysis", () => {
   beforeEach(() => {

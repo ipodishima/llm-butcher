@@ -24,6 +24,10 @@ export interface ButcherConfig {
   severity: {
     blockThreshold: "medium" | "high" | "critical";
   };
+  rules?: {
+    disabledPacks?: string[];
+    disabledRules?: string[];
+  };
 }
 
 export const DEFAULT_CONFIG: ButcherConfig = {

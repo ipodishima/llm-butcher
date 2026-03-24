@@ -1,0 +1,336 @@
+id: macos
+name: macOS-Specific Threat Detection
+description: Detects macOS-specific abuse including Keychain access, GhostClaw indicators, TCC manipulation, and Apple app data theft
+rules:
+  - id: keychain-credential-extraction
+    name: "macOS Keychain credential extraction"
+    severity: critical
+    tags: [macos, keychain, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bsecurity\s+(?:find-generic-password|find-internet-password|dump-keychain)'
+    recommendation: "This command extracts passwords from the macOS Keychain. Do NOT run it."
+
+  - id: keychain-database-access
+    name: "Direct macOS Keychain database access"
+    severity: critical
+    tags: [macos, keychain, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'sqlite3\s+[^\n]*Keychains'
+    recommendation: "This command reads the macOS Keychain database directly. Do NOT run it."
+
+  - id: osascript-abuse
+    name: "osascript abuse — system event or dialog manipulation"
+    severity: high
+    tags: [macos, osascript]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'osascript\s+-e\s.*(?:System Events|display\s+dialog|keystroke|key\s+code)'
+    recommendation: "This command uses osascript to interact with the system. Verify this is expected."
+
+  - id: screencapture-exfil
+    name: "Screen capture with exfiltration"
+    severity: critical
+    tags: [macos, screencapture, exfiltration]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'screencapture\s[^\n]*&&\s*curl|screencapture\s[^\n]*\|\s*curl'
+    recommendation: "This command captures your screen and uploads it to a remote server. Do NOT run it."
+
+  - id: screencapture
+    name: "Screen capture command"
+    severity: high
+    tags: [macos, screencapture]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'screencapture\s'
+    recommendation: "This command captures your screen. Verify this is expected."
+
+  - id: ghostclaw-dscl-auth
+    name: "Validates macOS credentials (GhostClaw indicator)"
+    severity: critical
+    tags: [macos, ghostclaw, credentials]
+    scope: both
+    match:
+      mode: regex
+      pattern: 'dscl\s+\.\s+-authonly'
+    recommendation: "This command validates macOS passwords — a known GhostClaw technique. Do NOT run it."
+
+  - id: ghostclaw-dscl-read
+    name: "macOS authentication data read via dscl"
+    severity: critical
+    tags: [macos, ghostclaw, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'dscl\s+\.\s+-read\s.*AuthenticationAuthority'
+    recommendation: "This command reads macOS authentication data. Do NOT run it."
+
+  - id: ghostclaw-system-prefs
+    name: "macOS System Preferences manipulation"
+    severity: critical
+    tags: [macos, ghostclaw]
+    scope: both
+    match:
+      mode: regex
+      pattern: 'x-apple\.systempreferences:.*Privacy'
+    recommendation: "This command tries to modify system privacy settings. Do NOT run it."
+
+  - id: ghostclaw-persistence-path
+    name: "Known GhostClaw persistence path detected"
+    severity: critical
+    tags: [macos, ghostclaw, persistence]
+    scope: script
+    match:
+      mode: regex
+      pattern: '~\/\.cache\/\.npm_telemetry'
+      flags: gi
+    recommendation: "This path is used by GhostClaw malware for persistence. Do NOT run it."
+
+  - id: ghostclaw-env-vars
+    name: "Known GhostClaw environment variables detected"
+    severity: critical
+    tags: [macos, ghostclaw]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'NODE_CHANNEL|GHOST_PASSWORD'
+      flags: gi
+    recommendation: "These environment variables are associated with GhostClaw malware. Do NOT run it."
+
+  - id: loginhook-persistence
+    name: "macOS LoginHook persistence via defaults write"
+    severity: critical
+    tags: [macos, persistence]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'defaults\s+write\s+com\.apple\.loginwindow\s+LoginHook'
+    recommendation: "This command sets a LoginHook that runs a script at every login. Do NOT run it."
+
+  - id: proxy-hijack
+    name: "Network proxy hijack (MITM attack)"
+    severity: critical
+    tags: [macos, network, mitm]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'networksetup\s+-set(?:web|secureweb|socksfirewall)proxy'
+    recommendation: "This command changes your network proxy settings, enabling man-in-the-middle attacks. Do NOT run it."
+
+  - id: proxy-config-read
+    name: "Network proxy configuration read"
+    severity: medium
+    tags: [macos, network]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'scutil\s+--proxy'
+    recommendation: "This command reads proxy settings. Verify this is expected."
+
+  - id: user-database-access
+    name: "Direct macOS user database access"
+    severity: critical
+    tags: [macos, credentials]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\/var\/db\/dslocal\/'
+    recommendation: "This command accesses the macOS local directory service database. Do NOT run it."
+
+  - id: tcc-reset
+    name: "macOS TCC privacy permissions reset"
+    severity: critical
+    tags: [macos, tcc, security]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'tccutil\s+reset'
+    recommendation: "This command resets macOS privacy permissions (camera, microphone, disk access). Do NOT run it."
+
+  - id: gatekeeper-disable
+    name: "macOS Gatekeeper disabled"
+    severity: critical
+    tags: [macos, security]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'spctl\s+--master-disable'
+    recommendation: "This command disables Gatekeeper, allowing unsigned malware to run. Do NOT run it."
+
+  - id: sip-disable
+    name: "macOS System Integrity Protection (SIP) disabled"
+    severity: critical
+    tags: [macos, security]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'csrutil\s+disable'
+    recommendation: "This command disables SIP, removing critical system protections. Do NOT run it."
+
+  - id: quarantine-strip
+    name: "macOS quarantine flag stripped"
+    severity: high
+    tags: [macos, security]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'xattr\s+[^\n]*-[rd][^\n]*com\.apple\.quarantine'
+    recommendation: "This command removes the quarantine flag from downloaded files, bypassing Gatekeeper warnings."
+
+  - id: tcc-database
+    name: "macOS TCC database manipulation"
+    severity: critical
+    tags: [macos, tcc]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'TCC\.db'
+    recommendation: "This command accesses the TCC privacy database directly, which can grant camera, microphone, or disk access to arbitrary apps. Do NOT run it."
+
+  - id: imessage-database
+    name: "iMessage database access"
+    severity: critical
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'Messages\/chat\.db'
+    recommendation: "This command accesses your iMessage database. Do NOT run it."
+
+  - id: iphone-backup
+    name: "iPhone backup data access"
+    severity: critical
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'MobileSync\/Backup|Manifest\.db'
+    recommendation: "This command accesses iPhone backup data. Do NOT run it."
+
+  - id: photos-library
+    name: "Photos library access"
+    severity: high
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'Photos\/Photos Library'
+    recommendation: "This command accesses your Photos library. Verify this is expected."
+
+  - id: apple-notes
+    name: "Apple Notes database access"
+    severity: critical
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'NoteStore\.sqlite'
+    recommendation: "This command accesses your Apple Notes database. Do NOT run it."
+
+  - id: apple-mail
+    name: "Apple Mail data access"
+    severity: critical
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'com\.apple\.mail|Mail\/.*\.emlx'
+    recommendation: "This command accesses your email data. Do NOT run it."
+
+  - id: apple-contacts
+    name: "Apple Contacts database access"
+    severity: critical
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'AddressBook.*\.abcddb|Contacts\.sqlite'
+    recommendation: "This command accesses your contacts database. Do NOT run it."
+
+  - id: critical-process-kill
+    name: "Critical macOS process kill"
+    severity: critical
+    tags: [macos, destructive]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'killall\s+(?:-9\s+)?(?:WindowServer|Dock|SystemUIServer|Finder|loginwindow)'
+    recommendation: "This command kills critical system processes, crashing your GUI session. Do NOT run it."
+
+  - id: webcam-imagesnap
+    name: "Webcam capture via imagesnap"
+    severity: high
+    tags: [macos, camera]
+    scope: command
+    match:
+      mode: regex
+      pattern: '\bimagesnap\b'
+    recommendation: "This command captures a photo from your webcam. Verify this is expected."
+
+  - id: webcam-exfil
+    name: "Webcam capture with exfiltration"
+    severity: critical
+    tags: [macos, camera, exfiltration]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'imagesnap[^\n]*(?:&&|\|)\s*(?:curl|wget|nc\b)'
+    recommendation: "This command captures a webcam photo and sends it to a remote server. Do NOT run it."
+
+  - id: ffmpeg-capture
+    name: "Audio/video capture via ffmpeg"
+    severity: high
+    tags: [macos, camera, microphone]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'ffmpeg[^\n]*avfoundation'
+    recommendation: "This command captures audio or video from your camera/microphone. Verify this is expected."
+
+  - id: keychain-metadata
+    name: "macOS Keychain metadata access"
+    severity: high
+    tags: [macos, keychain]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'Keychains\/metadata'
+    recommendation: "This command accesses Keychain metadata files. Verify this is expected."
+
+  - id: autosave-data
+    name: "macOS Autosave data access"
+    severity: high
+    tags: [macos, apple-data]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'Autosave\s*Information'
+    recommendation: "This command accesses unsaved document data from across all apps. Verify this is expected."
+
+  - id: finder-recent-files
+    name: "Finder preferences/recent files access"
+    severity: medium
+    tags: [macos, recon]
+    scope: command
+    match:
+      mode: regex
+      pattern: 'com\.apple\.finder\.plist'
+    recommendation: "This command reads Finder preferences which include recent files and locations."
+
+  - id: fake-dialog-script
+    name: "Script creates fake macOS dialog to steal credentials"
+    severity: high
+    tags: [macos, osascript, phishing]
+    scope: script
+    match:
+      mode: regex
+      pattern: 'osascript.*display\s+dialog'
+      flags: gi
+    recommendation: "This script shows fake system dialogs to trick you into entering your password."

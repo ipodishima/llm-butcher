@@ -2,3 +2,6 @@ node_modules/
 dist/
 .llm-butcher/
 *.tgz
+video/node_modules/
+video/out/
+video/dist/
