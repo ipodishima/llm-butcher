@@ -79,7 +79,7 @@ rules:
     scope: command
     match:
       mode: regex
-      pattern: '\bat\s+(?:now|midnight|noon|\d)'
+      pattern: '(?:^|[;&|]\s*)at\s+(?:now|midnight|noon|\d{1,2}:\d{2})'
     recommendation: "This command schedules execution for later, which can evade real-time security checks. Verify the scheduled command."
 
   - id: persistence-script

