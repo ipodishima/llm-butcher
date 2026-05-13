@@ -600,8 +600,13 @@ describe("commandAnalysis", () => {
       expect(results).toHaveLength(0);
     });
 
-    it("passes npm install", () => {
+    it("passes npm install by default (pnpm policy is opt-in)", () => {
       const results = analyzeCommand("npm install lodash");
+      expect(results).toHaveLength(0);
+    });
+
+    it("passes pnpm install", () => {
+      const results = analyzeCommand("pnpm install lodash");
       expect(results).toHaveLength(0);
     });
 

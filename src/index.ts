@@ -7,7 +7,9 @@ import { analyzeShellHeuristics } from "./checks/shellHeuristics.js";
 import { formatResults } from "./output/formatter.js";
 import { loadConfig } from "./config/loader.js";
 import { logAudit } from "./audit.js";
+import { policyPackId } from "./rules/types.js";
 import type { CheckResult } from "./checks/types.js";
+import type { ButcherConfig } from "./config/defaults.js";
 
 export interface HookInput {
   hook_event_name: string;
@@ -26,16 +28,23 @@ export function resetRulesState(): void {
   rulesInitialized = false;
 }
 
-async function ensureRulesLoaded(config: {
-  rules?: { disabledPacks?: string[]; disabledRules?: string[] };
-}): Promise<void> {
+async function ensureRulesLoaded(
+  config: Pick<ButcherConfig, "rules" | "policies">
+): Promise<void> {
   if (rulesInitialized) return;
-  const options = config.rules
-    ? {
-        disabledPacks: config.rules.disabledPacks,
-        disabledRules: config.rules.disabledRules,
-      }
-    : undefined;
+
+  const enabledFromPolicies = Object.entries(config.policies ?? {})
+    .filter(([, enabled]) => enabled === true)
+    .map(([name]) => policyPackId(name));
+  const enabledPacks = [
+    ...new Set([...(config.rules?.enabledPacks ?? []), ...enabledFromPolicies]),
+  ];
+
+  const options = {
+    disabledPacks: config.rules?.disabledPacks,
+    disabledRules: config.rules?.disabledRules,
+    enabledPacks: enabledPacks.length > 0 ? enabledPacks : undefined,
+  };
   await Promise.all([initCommandRules(options), initScriptRules(options)]);
   rulesInitialized = true;
 }

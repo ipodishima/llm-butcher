@@ -1,0 +1,30 @@
+id: policy-pnpm
+name: Enforce pnpm over npm (opt-in)
+description: |
+  Blocks `npm install / i / ci / add` and warns on `npx`, recommending pnpm
+  equivalents. Disabled by default. Enable with `llm-butcher policy enable pnpm`.
+  Motivation: the npm registry has been repeatedly compromised (e.g. the
+  TanStack incident, https://snyk.io/blog/tanstack-npm-packages-compromised/,
+  and the Shai-Hulud worm earlier in 2025). pnpm's content-addressable store
+  and stricter lockfile integrity reduce blast radius.
+optIn: true
+rules:
+  - id: npm-install-policy
+    name: "npm install used instead of pnpm (policy)"
+    severity: high
+    tags: [supply-chain, npm, policy, pnpm]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:^|[;&|`(\s])(?:sudo\s+)?npm\s+(?:install|i|ci|add)(?:\s|$)'
+    recommendation: "Policy: use pnpm instead of npm. The npm registry has been hit repeatedly by supply-chain compromises (e.g. TanStack, https://snyk.io/blog/tanstack-npm-packages-compromised/). pnpm enforces stricter lockfile integrity and content-addressable storage. Replace 'npm install' with 'pnpm install', 'npm i pkg' with 'pnpm add pkg', and 'npm ci' with 'pnpm install --frozen-lockfile'."
+
+  - id: npx-policy
+    name: "npx executes remote code (policy)"
+    severity: medium
+    tags: [supply-chain, npm, policy, pnpm]
+    scope: command
+    match:
+      mode: regex
+      pattern: '(?:^|[;&|`(\s])(?:sudo\s+)?npx(?:\s|$)'
+    recommendation: "Policy: avoid npx. It fetches and executes packages from the npm registry on the fly with no lockfile guarantees — the exact scenario the TanStack supply-chain compromise exploited. Use 'pnpm dlx' (sandboxed, deterministic) or install the package explicitly with 'pnpm add -D <pkg>' and invoke it via package.json scripts."

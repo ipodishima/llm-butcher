@@ -5,3 +5,7 @@ dist/
 video/node_modules/
 video/out/
 video/dist/
+
+# This project uses pnpm — never commit a foreign lockfile.
+package-lock.json
+yarn.lock

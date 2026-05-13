@@ -35,8 +35,13 @@ describe("pipeline integration", () => {
     expect(result.output).toContain("lodash");
   });
 
-  it("allows legitimate npm packages", async () => {
+  it("allows legitimate npm packages (pnpm policy is opt-in)", async () => {
     const result = await run("npm install lodash");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("allows legitimate pnpm packages", async () => {
+    const result = await run("pnpm install lodash");
     expect(result.exitCode).toBe(0);
   });
 
