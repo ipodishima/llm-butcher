@@ -1,6 +1,12 @@
 import { run } from "../src/index.js";
 import { parseHookInput } from "../src/parser/inputParser.js";
-import { loadAllRules } from "../src/rules/loader.js";
+import { loadAllRules, listPacks, resetRuleCache } from "../src/rules/loader.js";
+import { policyNameFromPackId } from "../src/rules/types.js";
+import {
+  readUserConfig,
+  writeUserConfig,
+  USER_CONFIG_PATH,
+} from "../src/config/loader.js";
 import { toSarif, toJson } from "../src/output/sarif.js";
 
 type OutputFormat = "text" | "sarif" | "json";
@@ -15,8 +21,15 @@ function getOutputFormat(): OutputFormat {
   return "text";
 }
 
-// Handle CLI flags before reading stdin
-if (process.argv.includes("--list-rules")) {
+const args = process.argv.slice(2);
+const subcommand = args[0];
+
+if (subcommand === "policy") {
+  policyCommand(args.slice(1)).catch((error) => {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : "unknown"}\n`);
+    process.exit(1);
+  });
+} else if (process.argv.includes("--list-rules")) {
   listRules().catch((error) => {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : "unknown"}\n`);
     process.exit(1);
@@ -28,6 +41,116 @@ if (process.argv.includes("--list-rules")) {
     );
     process.exit(0); // Don't block on unexpected errors
   });
+}
+
+const POLICY_HELP = `Usage:
+  llm-butcher policy list              Show all available policies and their state.
+  llm-butcher policy enable <name>     Enable a policy (writes ~/.llm-butcher/config.json).
+  llm-butcher policy disable <name>    Disable a policy.
+  llm-butcher policy status <name>     Show whether a policy is enabled.
+
+Available policies are discovered from rule packs marked \`optIn: true\`. The
+pack id \`policy-<name>\` maps to the friendly name \`<name>\`.
+
+Examples:
+  llm-butcher policy enable pnpm       Block npm install / npx, recommend pnpm.
+`;
+
+interface PolicyContext {
+  nameArg: string | undefined;
+  policies: Map<string, { packId: string; ruleCount: number }>;
+}
+
+const policyHandlers: Record<string, (ctx: PolicyContext) => Promise<number>> = {
+  list: handleList,
+  enable: (ctx) => handleSet(ctx, true),
+  disable: (ctx) => handleSet(ctx, false),
+  status: handleStatus,
+};
+
+async function policyCommand(rest: string[]): Promise<void> {
+  resetRuleCache();
+  const [action, nameArg] = rest;
+
+  if (!action || action === "help" || action === "--help" || action === "-h") {
+    process.stdout.write(POLICY_HELP);
+    process.exit(0);
+  }
+
+  const packs = await listPacks();
+  const policies = new Map<string, { packId: string; ruleCount: number }>();
+  for (const pack of packs) {
+    if (!pack.optIn) continue;
+    const friendly = policyNameFromPackId(pack.id) ?? pack.id;
+    policies.set(friendly, { packId: pack.id, ruleCount: pack.ruleCount });
+  }
+
+  const handler = policyHandlers[action];
+  if (!handler) {
+    process.stderr.write(POLICY_HELP);
+    process.exit(1);
+  }
+  process.exit(await handler({ nameArg, policies }));
+}
+
+async function handleList({ policies }: PolicyContext): Promise<number> {
+  if (policies.size === 0) {
+    process.stdout.write("No opt-in policies available.\n");
+    return 0;
+  }
+  const config = await readUserConfig();
+  const enabledMap = config.policies ?? {};
+  process.stdout.write("\nLLM-Butcher policies (opt-in):\n\n");
+  for (const [name, { packId, ruleCount }] of policies) {
+    const state = enabledMap[name] === true ? "ENABLED " : "disabled";
+    process.stdout.write(
+      `  [${state}] ${name.padEnd(12)} ${ruleCount} rule(s)  (pack: ${packId})\n`
+    );
+  }
+  process.stdout.write(
+    `\nEnable with: llm-butcher policy enable <name>\nConfig: ${USER_CONFIG_PATH}\n`
+  );
+  return 0;
+}
+
+function requirePolicyName(
+  ctx: PolicyContext
+): { name: string } | null {
+  if (!ctx.nameArg) {
+    process.stderr.write(`Missing policy name. Try: llm-butcher policy list\n`);
+    return null;
+  }
+  if (!ctx.policies.has(ctx.nameArg)) {
+    const known = Array.from(ctx.policies.keys()).join(", ") || "(none)";
+    process.stderr.write(
+      `Unknown policy "${ctx.nameArg}". Known policies: ${known}\n`
+    );
+    return null;
+  }
+  return { name: ctx.nameArg };
+}
+
+async function handleStatus(ctx: PolicyContext): Promise<number> {
+  const resolved = requirePolicyName(ctx);
+  if (!resolved) return 1;
+  const config = await readUserConfig();
+  const enabled = config.policies?.[resolved.name] === true;
+  process.stdout.write(
+    `Policy "${resolved.name}" is ${enabled ? "ENABLED" : "disabled"}.\n`
+  );
+  return 0;
+}
+
+async function handleSet(ctx: PolicyContext, enable: boolean): Promise<number> {
+  const resolved = requirePolicyName(ctx);
+  if (!resolved) return 1;
+  const config = await readUserConfig();
+  config.policies = { ...(config.policies ?? {}), [resolved.name]: enable };
+  await writeUserConfig(config);
+  process.stdout.write(
+    `Policy "${resolved.name}" ${enable ? "enabled" : "disabled"}. Wrote ${USER_CONFIG_PATH}.\n`
+  );
+  return 0;
 }
 
 async function listRules(): Promise<void> {

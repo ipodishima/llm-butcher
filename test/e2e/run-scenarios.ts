@@ -99,9 +99,9 @@ const SCENARIOS: Scenario[] = [
     minFindings: 0,
   },
   {
-    name: "Legit npm install",
-    description: "Real npm package — should pass",
-    command: "npm install lodash",
+    name: "Legit pnpm install",
+    description: "Real package via pnpm — should pass",
+    command: "pnpm install lodash",
     expectBlock: false,
     minFindings: 0,
   },

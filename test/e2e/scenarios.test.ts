@@ -228,8 +228,13 @@ describe("e2e scenarios", { timeout: 15000 }, () => {
       expect(result.results).toHaveLength(0);
     });
 
-    it("npm install of legitimate package passes", async () => {
+    it("npm install of legitimate package passes (pnpm policy opt-in, off by default)", async () => {
       const result = await run("npm install lodash");
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("pnpm install of legitimate package passes", async () => {
+      const result = await run("pnpm install lodash");
       expect(result.exitCode).toBe(0);
     });
 

@@ -4,6 +4,7 @@ import {
   loadBuiltInRules,
   getCommandRules,
   getScriptRules,
+  listPacks,
   resetRuleCache,
 } from "../../src/rules/loader.js";
 import { Severity } from "../../src/checks/types.js";
@@ -96,7 +97,32 @@ describe("rule loader", () => {
   it("caches rules between calls", async () => {
     const rules1 = await loadAllRules();
     const rules2 = await loadAllRules();
-    // Same reference because of caching
-    expect(rules1).toBe(rules2);
+    // Filter step allocates a fresh array; verify cache by deep-equal + length.
+    expect(rules2).toStrictEqual(rules1);
+    expect(rules2.length).toBe(rules1.length);
+  });
+
+  describe("opt-in policies", () => {
+    it("does not load opt-in packs by default", async () => {
+      const rules = await loadAllRules();
+      expect(rules.some((r) => r.packId === "policy-pnpm")).toBe(false);
+    });
+
+    it("loads opt-in pack when explicitly enabled", async () => {
+      resetRuleCache();
+      const rules = await loadAllRules({ enabledPacks: ["policy-pnpm"] });
+      expect(rules.some((r) => r.packId === "policy-pnpm")).toBe(true);
+      expect(rules.some((r) => r.id === "npm-install-policy")).toBe(true);
+    });
+
+    it("listPacks reports opt-in metadata", async () => {
+      const packs = await listPacks();
+      const pnpm = packs.find((p) => p.id === "policy-pnpm");
+      expect(pnpm).toBeDefined();
+      expect(pnpm!.optIn).toBe(true);
+      expect(pnpm!.ruleCount).toBeGreaterThanOrEqual(2);
+      const supply = packs.find((p) => p.id === "supply-chain");
+      expect(supply!.optIn).toBe(false);
+    });
   });
 });

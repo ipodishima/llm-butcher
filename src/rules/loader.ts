@@ -39,7 +39,12 @@ const SEVERITY_MAP: Record<string, Severity> = {
   critical: Severity.CRITICAL,
 };
 
-let cachedRules: CompiledRule[] | null = null;
+interface RuleCache {
+  rules: CompiledRule[];
+  optInPackIds: Set<string>;
+}
+
+let cache: RuleCache | null = null;
 
 function compileRule(
   rule: YamlRulePack["rules"][number],
@@ -85,20 +90,30 @@ function compileRule(
   };
 }
 
-async function loadPackFromFile(filePath: string): Promise<CompiledRule[]> {
+interface LoadedPack {
+  rules: CompiledRule[];
+  optIn: boolean;
+  packId: string;
+}
+
+async function loadPackFromFile(filePath: string): Promise<LoadedPack | null> {
   try {
     const content = await readFile(filePath, "utf-8");
     const pack = yaml.load(content) as YamlRulePack;
     if (!pack || !pack.rules || !Array.isArray(pack.rules)) {
-      return [];
+      return null;
     }
-    return pack.rules.map((rule) => compileRule(rule, pack.id));
+    return {
+      packId: pack.id,
+      optIn: pack.optIn === true,
+      rules: pack.rules.map((rule) => compileRule(rule, pack.id)),
+    };
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function loadPacksFromDirectory(dir: string): Promise<CompiledRule[]> {
+async function loadPacksFromDirectory(dir: string): Promise<LoadedPack[]> {
   try {
     const files = await readdir(dir);
     const yamlFiles = files.filter(
@@ -107,71 +122,108 @@ async function loadPacksFromDirectory(dir: string): Promise<CompiledRule[]> {
     const results = await Promise.all(
       yamlFiles.map((f) => loadPackFromFile(join(dir, f)))
     );
-    return results.flat();
+    return results.filter((p): p is LoadedPack => p !== null);
   } catch {
     return [];
   }
 }
 
-export async function loadBuiltInRules(): Promise<CompiledRule[]> {
+async function loadBuiltInPacks(): Promise<LoadedPack[]> {
   const packsDir = await findPacksDir();
   if (!packsDir) return [];
   return loadPacksFromDirectory(packsDir);
 }
 
-export async function loadCustomRules(): Promise<CompiledRule[]> {
-  const rules: CompiledRule[] = [];
-
-  // Global custom rules
+async function loadCustomPacks(): Promise<LoadedPack[]> {
   const globalDir = join(homedir(), ".llm-butcher", "rules");
-  rules.push(...(await loadPacksFromDirectory(globalDir)));
-
-  // Project custom rules
   const projectDir = join(process.cwd(), ".llm-butcher", "rules");
-  rules.push(...(await loadPacksFromDirectory(projectDir)));
+  const [global, project] = await Promise.all([
+    loadPacksFromDirectory(globalDir),
+    loadPacksFromDirectory(projectDir),
+  ]);
+  return [...global, ...project];
+}
 
-  return rules;
+/** Exported for tests that count rules across all packs. */
+export async function loadBuiltInRules(): Promise<CompiledRule[]> {
+  const packs = await loadBuiltInPacks();
+  return packs.flatMap((p) => p.rules);
+}
+
+export async function loadCustomRules(): Promise<CompiledRule[]> {
+  const packs = await loadCustomPacks();
+  return packs.flatMap((p) => p.rules);
+}
+
+async function getOrBuildCache(): Promise<RuleCache> {
+  if (cache) return cache;
+
+  const [builtIn, custom] = await Promise.all([
+    loadBuiltInPacks(),
+    loadCustomPacks(),
+  ]);
+
+  const optInPackIds = new Set<string>();
+  for (const pack of [...builtIn, ...custom]) {
+    if (pack.optIn) optInPackIds.add(pack.packId);
+  }
+
+  // Deduplicate by rule id (custom rules override built-in)
+  const ruleMap = new Map<string, CompiledRule>();
+  for (const pack of builtIn) for (const rule of pack.rules) ruleMap.set(rule.id, rule);
+  for (const pack of custom) for (const rule of pack.rules) ruleMap.set(rule.id, rule);
+
+  cache = { rules: Array.from(ruleMap.values()), optInPackIds };
+  return cache;
 }
 
 export interface LoadRulesOptions {
   disabledPacks?: string[];
   disabledRules?: string[];
+  /** Pack ids of opt-in packs to enable. Opt-in packs are off by default. */
+  enabledPacks?: string[];
 }
 
 export async function loadAllRules(
   options?: LoadRulesOptions
 ): Promise<CompiledRule[]> {
-  if (cachedRules) {
-    return filterRules(cachedRules, options);
-  }
-
-  const builtIn = await loadBuiltInRules();
-  const custom = await loadCustomRules();
-
-  // Deduplicate by ID (custom rules override built-in)
-  const ruleMap = new Map<string, CompiledRule>();
-  for (const rule of builtIn) {
-    ruleMap.set(rule.id, rule);
-  }
-  for (const rule of custom) {
-    ruleMap.set(rule.id, rule);
-  }
-
-  cachedRules = Array.from(ruleMap.values());
-  return filterRules(cachedRules, options);
+  const { rules, optInPackIds } = await getOrBuildCache();
+  return filterRules(rules, optInPackIds, options);
 }
 
 function filterRules(
   rules: CompiledRule[],
+  optInPackIds: Set<string>,
   options?: LoadRulesOptions
 ): CompiledRule[] {
-  if (!options) return rules;
+  const enabled = options?.enabledPacks ?? [];
 
   return rules.filter((rule) => {
-    if (options.disabledPacks?.includes(rule.packId)) return false;
-    if (options.disabledRules?.includes(rule.id)) return false;
+    if (optInPackIds.has(rule.packId) && !enabled.includes(rule.packId))
+      return false;
+    if (options?.disabledPacks?.includes(rule.packId)) return false;
+    if (options?.disabledRules?.includes(rule.id)) return false;
     return true;
   });
+}
+
+/**
+ * Return metadata for every loaded pack (including opt-in ones).
+ * Used by the CLI policy list / status commands.
+ */
+export async function listPacks(): Promise<
+  Array<{ id: string; optIn: boolean; ruleCount: number }>
+> {
+  const { rules, optInPackIds } = await getOrBuildCache();
+  const byPack = new Map<string, number>();
+  for (const rule of rules) {
+    byPack.set(rule.packId, (byPack.get(rule.packId) ?? 0) + 1);
+  }
+  return Array.from(byPack.entries()).map(([id, ruleCount]) => ({
+    id,
+    ruleCount,
+    optIn: optInPackIds.has(id),
+  }));
 }
 
 export function getCommandRules(rules: CompiledRule[]): CompiledRule[] {
@@ -184,5 +236,5 @@ export function getScriptRules(rules: CompiledRule[]): CompiledRule[] {
 
 /** Reset the cache (for testing) */
 export function resetRuleCache(): void {
-  cachedRules = null;
+  cache = null;
 }

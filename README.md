@@ -8,8 +8,8 @@
   <a href="https://www.npmjs.com/package/llm-butcher"><img src="https://img.shields.io/npm/v/llm-butcher.svg" alt="npm version"></a>
   <a href="https://github.com/ipodishima/llm-butcher/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/llm-butcher.svg" alt="license"></a>
   <a href="https://www.npmjs.com/package/llm-butcher"><img src="https://img.shields.io/npm/dm/llm-butcher.svg" alt="downloads"></a>
-  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/rules-114-blue.svg" alt="rules"></a>
-  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/tests-203-brightgreen.svg" alt="tests"></a>
+  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/rules-114%20%2B%20opt--in-blue.svg" alt="rules"></a>
+  <a href="https://github.com/ipodishima/llm-butcher"><img src="https://img.shields.io/badge/tests-217-brightgreen.svg" alt="tests"></a>
   <a href="https://buymeacoffee.com/marianpaul"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
@@ -67,7 +67,7 @@ For the full breakdown of how the GhostClaw attack works, see:
 
 ## What LLM-Butcher Catches
 
-Run `npm run demo` to see this yourself:
+Run `pnpm demo` to see this yourself:
 
 ```
 SCENARIO                       RESULT     FINDINGS
@@ -95,14 +95,60 @@ pip Typosquat (requsts)        BLOCKED    2
   CRITICAL: Package "requsts" does not exist in pip registry
 Clean Install Script           PASSED     0
 Safe Command (git)             PASSED     0
-Legit npm install              PASSED     0
+Legit pnpm install             PASSED     0
 ```
+
+## Opt-in Policies — defend against npm supply-chain attacks (TanStack, Shai-Hulud)
+
+The npm registry has been hit by a series of high-profile supply-chain compromises — most recently the [TanStack npm packages compromise](https://snyk.io/blog/tanstack-npm-packages-compromised/) and the [Shai-Hulud worm](https://www.stepsecurity.io/blog/ctrl-tinycolor-and-40-npm-packages-compromised). Every one of them runs malicious code at `npm install` time before any of your other defenses can react. The common mitigation is **stop using `npm` and `npx`; use `pnpm` instead** — pnpm's content-addressable store and strict lockfile reduce blast radius and make tampering visible.
+
+LLM-Butcher ships an **opt-in `pnpm` policy** that blocks `npm install / i / ci / add` and warns on `npx`, with a clear recommendation pointing to the pnpm equivalent. It's **off by default** so the tool stays unopinionated for teams that still use npm.
+
+### Enable it (one command)
+
+```bash
+llm-butcher policy enable pnpm
+```
+
+That writes `~/.llm-butcher/config.json` with `{ "policies": { "pnpm": true } }`. From the next Claude Code command onward, LLM-Butcher will intercept and block:
+
+- `npm install` → recommend `pnpm install`
+- `npm i <pkg>` / `npm add <pkg>` → recommend `pnpm add <pkg>`
+- `npm ci` → recommend `pnpm install --frozen-lockfile`
+- `npx <cmd>` → recommend `pnpm dlx <cmd>`
+
+`npm run`, `npm test`, `npm publish`, `npm view`, etc. continue to pass — only the package-fetching subcommands are intercepted.
+
+### Manage policies
+
+```bash
+llm-butcher policy list                 # show all available policies and their state
+llm-butcher policy status pnpm          # check whether pnpm policy is enabled
+llm-butcher policy disable pnpm         # turn it off
+```
+
+Layer the same enforcement at the Claude Code permission layer for defense in depth — add to `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(pnpm*)", "Bash(pnpx*)"],
+    "deny": [
+      "Bash(npm install*)", "Bash(npm i *)", "Bash(npm i)",
+      "Bash(npm ci*)", "Bash(npm add*)", "Bash(npx*)",
+      "Bash(sudo npm install*)"
+    ]
+  }
+}
+```
+
+The permission layer stops Claude Code from invoking npm at all; the LLM-Butcher hook catches anything that slips through (chained commands, unusual quoting, etc.) and prints an actionable recommendation.
 
 ## How It Works
 
 LLM-Butcher runs as a **PreToolUse hook** in Claude Code. When Claude Code is about to run a shell command, LLM-Butcher intercepts it and runs four checks:
 
-### 1. Command & Script Analysis (114 rules across 9 YAML packs)
+### 1. Command & Script Analysis (114 rules across 9 YAML packs, plus opt-in policy packs)
 
 All detection rules are defined in [Nuclei-inspired YAML files](src/rules/packs/) — easy to read, extend, and contribute to. Run `llm-butcher --list-rules` to see all loaded rules.
 
@@ -154,20 +200,22 @@ LLM-Butcher resolves variable assignments, reconstructs the actual command, and 
 
 ## Installation
 
-### From npm
+### From npm registry (via pnpm)
 
 ```bash
-npm install -g llm-butcher
+pnpm add -g llm-butcher
 ```
+
+> This project is built and dogfooded with [pnpm](https://pnpm.io/) — pnpm's content-addressable store and strict lockfile reduce the blast radius of npm registry compromises (TanStack, Shai-Hulud). The package is published to the npm registry, but install it via pnpm.
 
 ### From source
 
 ```bash
 git clone https://github.com/ipodishima/llm-butcher.git
 cd llm-butcher
-npm install
-npm run build
-npm link
+pnpm install
+pnpm run build
+pnpm link --global
 ```
 
 ### Hook setup
@@ -192,7 +240,7 @@ After installing, add LLM-Butcher to your Claude Code settings (`.claude/setting
 }
 ```
 
-If you installed from source without `npm link`, point directly to the built file:
+If you installed from source without `pnpm link --global`, point directly to the built file:
 
 ```json
 {
@@ -223,9 +271,9 @@ You can test LLM-Butcher against safe, simulated attack scenarios without instal
 ```bash
 git clone https://github.com/ipodishima/llm-butcher.git
 cd llm-butcher
-npm install
-npm run build
-npm run demo
+pnpm install
+pnpm run build
+pnpm demo
 ```
 
 This runs all 12 scenarios and prints a pass/fail report.
@@ -237,7 +285,7 @@ This is the most realistic way to test — you'll see LLM-Butcher block attacks 
 **Terminal 1** — start the local fixture server:
 
 ```bash
-npm run test:server
+pnpm test:server
 ```
 
 The server prints a list of prompts you can copy-paste. It looks like:
@@ -332,12 +380,12 @@ Set `blockThreshold` to `"critical"` for a more permissive mode, or `"medium"` f
 ## Development
 
 ```bash
-npm install          # Install dependencies
-npm run build        # Build for distribution
-npm test             # Run all 203 tests
-npm run test:e2e     # Run E2E scenarios only
-npm run demo         # Run the visual demo
-npm run test:server  # Start fixture server for manual testing
+pnpm install         # Install dependencies
+pnpm run build       # Build for distribution
+pnpm test            # Run all 217 tests
+pnpm test:e2e        # Run E2E scenarios only
+pnpm demo            # Run the visual demo
+pnpm test:server     # Start fixture server for manual testing
 ```
 
 ## How It Complements Existing Tools

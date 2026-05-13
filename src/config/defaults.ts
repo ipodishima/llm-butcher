@@ -27,7 +27,13 @@ export interface ButcherConfig {
   rules?: {
     disabledPacks?: string[];
     disabledRules?: string[];
+    enabledPacks?: string[];
   };
+  /**
+   * Opt-in policies. Friendly name → enabled. Maps to a pack id of the form
+   * `policy-<name>`. Use the CLI: `llm-butcher policy enable <name>`.
+   */
+  policies?: Record<string, boolean>;
 }
 
 export const DEFAULT_CONFIG: ButcherConfig = {
